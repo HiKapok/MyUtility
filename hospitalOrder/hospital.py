@@ -15,6 +15,7 @@ import time
 ##print(urldata)
 
 def getMyOpener(head):
+    #print(head)
     cookies = http.cookiejar.CookieJar()
     processor = urllib.request.HTTPCookieProcessor(cookies)
     opener = urllib.request.build_opener(processor)
@@ -30,6 +31,7 @@ def getMyOpener(head):
 header = {
     'Host': 'www.jnszxyy.com:8082',
     'Connection': 'keep-alive',
+    #'Cache-Control': 'max-age=0',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
     'Upgrade-Insecure-Requests': '1',
     'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.101 Safari/537.36',
@@ -37,18 +39,35 @@ header = {
     'Accept-Encoding': 'gzip, deflate, sdch',
     'Accept-Language': 'zh-CN,zh;q=0.8,en;q=0.6'
 }
+
+header_next={
+    'Host': 'www.jnszxyy.com:8082',
+    'Connection': 'keep-alive',
+    'Cache-Control': 'max-age=0',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Upgrade-Insecure-Requests': '1',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.101 Safari/537.36',
+    'Accept-Encoding': 'gzip, deflate, sdch',
+    'Accept-Language': 'zh-CN,zh;q=0.8,en;q=0.6'
+}
 invalidTbl=[]
 dateTbls = {}
 responsReg = re.compile('new Array\(.+\)')
-def makeOrder():
+cnt = 0
+def makeOrder(num,ampmreg,timereg,requeststring):
     ##params = urllib.parse.urlencode(header)
     ##url = "http://www.jnszxyy.com:8082/"
     ##with urllib.request.urlopen(url) as f:
     ##    print(f.read().decode('GBK'))
     #"http://www.jnszxyy.com:8082/"
     dateTbls.clear()
+    #print(num)
+    #if num == 1:    
     with getMyOpener(header).open('http://www.jnszxyy.com:8082/?orderMain?') as f:
-       datas=f.read().decode('GBK')
+        datas=f.read().decode('GBK')
+    #else:
+    #    with getMyOpener(header_next).open('http://www.jnszxyy.com:8082/?orderMain?') as f:
+    #       datas=f.read().decode('GBK')
     #print(datas)
     reg = re.compile('[0-9]{2,4},\"陈健\",[0-9]{2,4}')
     strlist = reg.findall(datas)
@@ -68,7 +87,8 @@ def makeOrder():
     print("doctor'id is:%s"%doctorId)
     with open('log.txt', 'a') as f:
         print('%s:医生编号：%s'%(time.strftime('%Y-%m-%d %X',time.localtime()),doctorId), file=f)
-    indexReg = re.compile('[0-9]{2,4},\"[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}\",'+doctorId)
+    #indexReg = re.compile('[0-9]{2,4},\"[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}\",'+doctorId)
+    indexReg = re.compile(timereg+doctorId)
     dates = indexReg.findall(datas)
 
     if len(dates) is 0:
@@ -83,7 +103,12 @@ def makeOrder():
     for str in dates:
         print(str)   
         spittbl = str.split(',')
-        keyReg = re.compile('[0-9]{5,7},\"[0-9]{2}:[0-9]{2} ━━ [0-9]{2}:[0-9]{2}.{0,10}\",'+spittbl[0])
+        #am and pm
+        #keyReg = re.compile('[0-9]{5,7},\"[0-9]{2}:[0-9]{2} ━━ [0-9]{2}:[0-9]{2}.{0,10}\",'+spittbl[0])
+        #am
+        keyReg = re.compile(ampmreg+spittbl[0])
+        #pm
+        #keyReg = re.compile('[0-9]{5,7},\"1[3-7]:[0-9]{2} ━━ 1[3-7]:[0-9]{2}.{0,10}\",'+spittbl[0])
         keys = keyReg.findall(datas)
 
         if len(keys) is 0:
@@ -119,7 +144,10 @@ def makeOrder():
         str = re.compile(' ━━ ').sub('-',str)
         with open('log.txt', 'a') as f:
             print('%s:尝试预约：%s'%(time.strftime('%Y-%m-%d %X',time.localtime()),str), file=f)
-        urls = 'http://www.jnszxyy.com:8082/?orderSave?Appoints_ID='+keystr+'&str_xingming=%CD%F5%B2%FD%B0%B2&str_yxzjhm=370481199312173854&str_phone=18366118438&str_address=%C9%BD%B6%AB%B4%F3%D1%A7%C7%A7%B7%F0%C9%BD%D0%A3%C7%F8&str_ykthm=&str_csrq=1993-12-17&str_childPname=&str_email=&str_sex=%C4%D0'
+            
+        #print(keystr)
+        urls = 'http://www.jnszxyy.com:8082/?orderSave?Appoints_ID='+keystr+requeststring
+        #os._exit(1)
         #print(urls)
         with getMyOpener(header).open(urls) as f:
             responses=f.read().decode('GBK')
@@ -145,23 +173,99 @@ def makeOrder():
                 invalidTbl.append(keystr)
     return 0
 
+name=''
+sex=''
+addr=''
+idnum=''
+phonenum=''
+timerange=''
+am_or_pm=''
+mailaddr=''
 
+with open('configure.txt', 'r') as f:
+    namestr = f.readline().strip().split('%')[-1]
+    print('姓名：%s'%namestr)
+    #name = namestr.split('%')[-1].encode('GB2312')
+    #bb='123'.encode('GB2312')
+    for byte in namestr.encode('GB2312'):
+        #print(byte)
+        name=name+'%{0:X}'.format(byte)
+    #print(name)
+    sexstr = f.readline().strip().split('%')[-1]
+    print('性别：%s'%sexstr)
+    for byte in sexstr.encode('GB2312'):
+        sex=sex+'%{0:X}'.format(byte)
+    idnumstr = f.readline()
+    idnum = idnumstr.strip().split('%')[-1]
+    print('身份证号：%s'%idnum)
+    phonenumstr = f.readline()
+    phonenum = phonenumstr.strip().split('%')[-1]
+    print('手机号：%s'%phonenum)
+    addrstr = f.readline().strip().split('%')[-1]
+    for byte in addrstr.encode('GB2312'):
+        #print(byte)
+        if byte<123:
+            addr=addr+'{0:c}'.format(byte)
+        else:
+            addr=addr+'%{0:X}'.format(byte)
+    
+    timerangestr = f.readline()
+    timerange = timerangestr.strip().split('%')[-1]
+    am_or_pm_str = f.readline()
+    am_or_pm = am_or_pm_str.strip().split('%')[-1]
+    mailstr = f.readline()
+    mailaddr = mailstr.strip().split('%')[-1]
+    print('邮箱：%s'%mailaddr)
+
+inputstr = input("请输入ok以确认以上信息正确：")
+if inputstr != 'ok':
+    os._exit(1)
+    
+##print(name)
+##print(idnum)
+##print(phonenum)
+##print(addr)
+##print(am_or_pm)
+##print(timerange)
+##print(mailaddr)
+
+##print(idnum[6:10])
+##print(idnum[10:12])
+##print(idnum[12:14])
+requeststr='&str_xingming='+name+'&str_yxzjhm='+idnum+'&str_phone='+phonenum+\
+            '&str_address='+addr+'&str_ykthm=&str_csrq='+idnum[6:10]+'-'+\
+            idnum[10:12]+'-'+idnum[12:14]+'&str_childPname=&str_email=&str_sex='+\
+            sex
+
+timereg='[0-9]{2,4},\\"[0-9]{4}-[0-9]{1,2}-[0-9]['+timerange+']\\",'
+ampmreg=''
+if am_or_pm=='a':
+    ampmreg='[0-9]{5,7},\\"[01][8-9|0-2]:[0-9]{2} ━━ [01][8-9|0-2]:[0-9]{2}.{0,10}\\",'
+elif am_or_pm=='b':
+    ampmreg='[0-9]{5,7},\\"1[3-7]:[0-9]{2} ━━ 1[3-7]:[0-9]{2}.{0,10}\\",'
+else:
+    ampmreg='[0-9]{5,7},\\"[0-9]{2}:[0-9]{2} ━━ [0-9]{2}:[0-9]{2}.{0,10}\\",'
+
+##print(requeststr)
+##print(timereg)
+##print(ampmreg)
+        
 with open('log.txt', 'w') as f:
     print('%s:开始预约...'%time.strftime('%Y-%m-%d %X',time.localtime()), file=f)
-cnt = 0
+
 while True:
     cnt+=1
     with open('log.txt', 'a') as f:
         print('%s:第%d次尝试预约...'%(time.strftime('%Y-%m-%d %X',time.localtime()),cnt), file=f)
     print('预约中...')
-    res = makeOrder()
+    res = makeOrder(cnt,ampmreg,timereg,requeststr)
     if res is 1:
         break
     elif res is 2:
         with open('log.txt', 'a') as f:
             print('%s:无法找到医生陈健'%time.strftime('%Y-%m-%d %X',time.localtime()), file=f)
         break
-    time.sleep(15)
+    time.sleep(10)
 print('恭喜预约成功...')
 
 

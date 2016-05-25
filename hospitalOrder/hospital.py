@@ -6,6 +6,11 @@ import http.cookiejar
 import re
 import os
 import time
+import smtplib
+import imaplib
+import datetime
+import email.mime.multipart
+from email.mime.text import MIMEText
 
 ##url = "http://www.baidu.com"
 ##data = urllib.request.urlopen(url).read()
@@ -74,7 +79,7 @@ def makeOrder(num,ampmreg,timereg,requeststring):
 
     if strlist is None:
         print("failed to find doctor:陈健.")
-        return 2
+        return 2,''
         os._exit(1)
 
     mat = re.search('[0-9]{2,4}',strlist[0])
@@ -168,10 +173,10 @@ def makeOrder(num,ampmreg,timereg,requeststring):
                 with open('log.txt', 'a') as f:
                     print('%s:预约成功！时间：%s'%(time.strftime('%Y-%m-%d %X',time.localtime()),tempstr), file=f)  
                 print("ok!time:%s"%tempstr)
-                return 1
+                return 1,'恭喜您预约成功！时间：'+tempstr+'\r\n'+retTbls[0].split(',')[1][1:-1]+'\r\n网络预约查询网址：'+"http://www.jnszxyy.com:8082/?orderSearch?"
             else:
                 invalidTbl.append(keystr)
-    return 0
+    return 0,''
 
 name=''
 sex=''
@@ -249,7 +254,60 @@ else:
 ##print(requeststr)
 ##print(timereg)
 ##print(ampmreg)
-        
+
+def mail_login(username,passwd):
+    print("登陆邮箱...")
+    while True:
+        try:
+            imap = imaplib.IMAP4_SSL('imap.aliyun.com')
+            d = imap.login(username, passwd)
+            print("登陆成功:%s"%d[-1])
+        except Exception as e:
+            print(str(e))     
+        break
+
+def sendEmailMIME(username,password,destination,subject,message,file):
+    plainTxt = MIMEText(message,_subtype='plain',_charset='gb2312')
+    msg = email.mime.multipart.MIMEMultipart()
+    attachs = MIMEText(open(file, 'rb').read(), 'base64', 'gb2312')
+    attachs["Content-Type"] = 'application/octet-stream'
+    attachs["Content-Disposition"] = 'attachment; filename="order_log.txt"'
+    msg['to'] = destination
+    msg['from'] = username
+    msg['subject'] = subject
+    msg['Date'] = datetime.datetime.now().strftime("%H:%M:%S %d-%b-%Y")
+    msg.attach(plainTxt)
+    msg.attach(attachs)
+    try:
+        smtp = smtplib.SMTP('smtp.aliyun.com',25)
+        smtp.ehlo()
+        #smtp.starttls()
+        smtp.login(username, password)
+        smtp.sendmail(msg['from'], msg['to'], msg.as_string())
+        return True
+    except smtplib.SMTPException as e:
+        print(str(e))
+        return False
+	
+	
+def sendEmail(username,password,destination,subject,message):
+    content = MIMEText(message,_subtype='plain',_charset='gb2312') 
+    content['Subject'] = subject
+    content['From'] = username
+    content['To'] = destination
+    content['Date'] = datetime.datetime.now().strftime("%H:%M:%S %d-%b-%Y")
+    #content['Date'] = formatdate(localtime=True)
+    try:
+        smtp = smtplib.SMTP('smtp.aliyun.com',25)
+        smtp.ehlo()
+        #smtp.starttls()
+        smtp.login(username, password)
+        smtp.sendmail(username, destination, content.as_string())
+        return True
+    except smtplib.SMTPException as e:
+        print(str(e))
+        return False
+		        
 with open('log.txt', 'w') as f:
     print('%s:开始预约...'%time.strftime('%Y-%m-%d %X',time.localtime()), file=f)
 
@@ -258,7 +316,7 @@ while True:
     with open('log.txt', 'a') as f:
         print('%s:第%d次尝试预约...'%(time.strftime('%Y-%m-%d %X',time.localtime()),cnt), file=f)
     print('预约中...')
-    res = makeOrder(cnt,ampmreg,timereg,requeststr)
+    res,strings = makeOrder(cnt,ampmreg,timereg,requeststr)
     if res is 1:
         break
     elif res is 2:
@@ -266,6 +324,11 @@ while True:
             print('%s:无法找到医生陈健'%time.strftime('%Y-%m-%d %X',time.localtime()), file=f)
         break
     time.sleep(10)
+if res is 1:
+    if mailaddr != '':
+        mail_login("python_program@aliyun.com","")
+        sendEmailMIME("python_program@aliyun.com","",mailaddr,"中心医院自动预约结果通知",strings,'log.txt')
+    
 print('恭喜预约成功...')
 
 
